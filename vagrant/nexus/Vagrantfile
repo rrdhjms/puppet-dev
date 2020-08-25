@@ -1,0 +1,29 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+$script = <<-SCRIPT
+sudo docker volume create --name nexus-data
+sudo docker run -d --restart always -p 8081:8081 --name nexus -v nexus-data:/nexus-data sonatype/nexus3
+SCRIPT
+
+# To get the intial admin password, connect to the VM and use:
+# sudo cat /var/lib/docker/volumes/nexus-data/_data/admin.password
+
+Vagrant.configure("2") do |config|
+
+  config.vm.box = "ubuntu/bionic64"
+
+  config.vm.define "nexus" do |nexus|
+    nexus.vm.hostname = "nexus"
+    nexus.vm.network "private_network", ip: "172.31.0.13"
+    nexus.vm.provision "shell", :path => "../scripts/puppetagent-ubuntu.sh", :args => "'172.31.0.10' 'nexus'"
+    # nexus.vm.provision "shell", :path => "../scripts/dockerinstall-ubuntu.sh"
+    # nexus.vm.privision "shell", inline: $script
+  end
+
+  config.vm.provider :virtualbox do |p|
+    p.customize ["modifyvm", :id, "--memory", 4048]
+    p.customize ["modifyvm", :id, "--cpus", 1]
+  end
+
+end

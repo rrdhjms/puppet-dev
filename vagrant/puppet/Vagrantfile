@@ -1,0 +1,76 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+$init = <<-SCRIPT
+sudo yum -y update
+sudo yum -y install git nano ntpdate
+sudo ntpdate 0.centos.pool.ntp.org
+sudo systemctl start ntpd
+sudo systemctl enable ntpd
+sudo yum -y install https://yum.puppetlabs.com/puppet-release-el-7.noarch.rpm
+SCRIPT
+
+$puppet = <<-SCRIPT
+sudo yum -y install puppetserver
+
+sudo sed -i 's/JAVA_ARGS="-Xms2g -Xmx2g/JAVA_ARGS="-Xms500m -Xmx500m/' /etc/sysconfig/puppetserver
+
+sudo echo '\n[main]
+certname = puppet
+server = puppet
+environment = production
+runinterval = 15m
+
+[agent]
+runinterval = 15m' >> /etc/puppetlabs/puppet/puppet.conf
+
+sudo sed -i '/code/a dns_alt_names = puppet' /etc/puppetlabs/puppet/puppet.conf
+
+sudo systemctl start puppetserver
+sudo systemctl enable puppetserver
+
+echo 'PATH=$PATH:/opt/puppetlabs/bin/puppetserver' >> /etc/profile
+SCRIPT
+
+$moveFiles = <<-SCRIPT
+sudo rpm -Uvh https://yum.puppet.com/puppet-tools-release-el-7.noarch.rpm
+sudo yum install pdk -y
+
+rm -rf /etc/puppetlabs/code/modules
+cp -R /vagrant/modules /etc/puppetlabs/code/modules
+
+mkdir -p /etc/puppetlabs/code/environments/production/manifests/
+sudo cp /vagrant/site.pp /etc/puppetlabs/code/environments/production/manifests/site.pp
+
+mkdir -p /etc/puppetlabs/code/environments/production/modules/prometheus/files
+
+sudo cp /vagrant/logger/docker-compose.yaml /etc/puppetlabs/code/environments/production/modules/prometheus/files/docker-compose.yml
+sudo cp /vagrant/logger/prometheus.yaml /etc/puppetlabs/code/environments/production/modules/prometheus/files/prometheus.yml
+
+sudo -i
+puppet module install puppet-archive --version 4.5.0
+puppet module install puppetlabs-docker --version 3.10.1
+exit
+SCRIPT
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "centos/7"
+
+  config.vm.define "puppet" do |puppet|
+    puppet.vm.hostname = "puppet"
+    puppet.vm.network "private_network", ip: "172.31.0.10"
+    puppet.vm.provision "shell", inline: $init
+    puppet.vm.provision :reload
+    puppet.vm.provision "shell", inline: $puppet
+    puppet.vm.provision "shell", inline: $moveFiles
+
+  end
+
+  config.vm.synced_folder "./shared", "/vagrant", type: "virtualbox"
+
+  config.vm.provider :virtualbox do |p|
+    p.gui = false
+    p.customize ["modifyvm", :id, "--memory", 2048]
+    p.customize ["modifyvm", :id, "--cpus", 1]
+  end
+end

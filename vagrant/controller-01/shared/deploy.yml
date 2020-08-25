@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      containers:
+        - name: jenkins-pod
+          image: jenkins/jenkins:latest
+          # env:
+          #   - name: JAVA_OPTS
+          #     value: -Djenkins.install.runSetupWizard=false
+          ports:
+            - name: http-port
+              containerPort: 8080
+            - name: jnlp-port
+              containerPort: 50000
+          volumeMounts:
+            - name: nfs-jenkins
+              mountPath: /var/jenkins_home
+      volumes:
+        - name: nfs-jenkins
+          persistentVolumeClaim:
+            claimName: nfs-jenkins-pvc

@@ -1,0 +1,67 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+BASE_IMAGE = "ubuntu/bionic64"
+PUPPET_IMAGE = "centos/8"
+NODE_COUNT = 2
+
+PUPPET_IP = "172.31.0.10"
+STORAGE_IP = "172.31.0.11"
+CONTROLLER_IP = "172.31.0.20"
+NODE_SUBNET = "172.31.0."
+
+
+
+Vagrant.configure("2") do |config|
+
+  config.vm.define "puppet" do |subconfig|
+    subconfig.vm.box = PUPPET_IMAGE
+    subconfig.vm.hostname = "puppet"
+    subconfig.vm.network :private_network, ip: PUPPET_IP
+    subconfig.vm.provider :virtualbox do |vb|
+      vb.name = "puppet"
+      vb.customize ["modifyvm", :id, "--memory", 2048]
+      vb.customize ["modifyvm", :id, "--cpus", 1]
+    end
+    subconfig.vm.provision "shell", :path => "../scripts/puppetserver-centos7.sh", :args => "'#{PUPPET_IP}' 'puppet'"
+  end
+
+  config.vm.define "storage" do |subconfig|
+    subconfig.vm.box = BASE_IMAGE
+    subconfig.vm.hostname = "storage"
+    subconfig.vm.network "private_network", ip: STORAGE_IP
+    subconfig.vm.provider :virtualbox do |vb|
+      vb.name = "storage"
+      vb.customize ["modifyvm", :id, "--memory", 1024]
+      vb.customize ["modifyvm", :id, "--cpus", 1]
+    end
+    #subconfig.vm.provision "shell", :path => "../scripts/puppetagent-ubuntu.sh", :args => "'#{PUPPET_IP}' 'storage'"
+  end
+
+  config.vm.define "controller" do |subconfig|
+    subconfig.vm.box = BASE_IMAGE
+    subconfig.vm.hostname = "controller"
+    subconfig.vm.network :private_network, ip: CONTROLLER_IP
+    subconfig.vm.provider :virtualbox do |vb|
+      vb.name = "controller"
+      vb.customize ["modifyvm", :id, "--memory", 2048]
+      vb.customize ["modifyvm", :id, "--cpus", 2]
+    end
+    #subconfig.vm.provision "shell", :path => "../scripts/puppetagent-ubuntu.sh", :args => "'#{PUPPET_IP}' 'controller'"
+  end
+
+  (1..NODE_COUNT).each do |i|
+    config.vm.define "node-0#{i}" do |subconfig|
+      subconfig.vm.box = BASE_IMAGE
+      subconfig.vm.hostname = "node-0#{i}"
+      subconfig.vm.network :private_network, ip: NODE_SUBNET+"#{30 + i}"
+      subconfig.vm.provider :virtualbox do |vb|
+        vb.name = "node-0#{i}"
+        vb.customize ["modifyvm", :id, "--memory", 2048]
+        vb.customize ["modifyvm", :id, "--cpus", 2]
+      end
+      #subconfig.vm.provision "shell", :path => "../scripts/puppetagent-ubuntu.sh", :args => "'#{PUPPET_IP}' 'node-#{i}'"
+    end
+  end
+
+end
